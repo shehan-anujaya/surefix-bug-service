@@ -1,6 +1,5 @@
 package lk.ijse.eca.surefix.bug.controller;
 
-import java.time.Instant;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -13,73 +12,63 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import jakarta.validation.Valid;
 import lk.ijse.eca.surefix.bug.dto.BugRequest;
+import lk.ijse.eca.surefix.bug.dto.BugStats;
 import lk.ijse.eca.surefix.bug.dto.StatusRequest;
 import lk.ijse.eca.surefix.bug.entity.Bug;
-import lk.ijse.eca.surefix.bug.repository.BugRepository;
+import lk.ijse.eca.surefix.bug.service.BugService;
 
 @RestController
 @RequestMapping("/api/v1/bugs")
 public class BugController {
 
-    private final BugRepository bugs;
+    private final BugService service;
 
-    public BugController(BugRepository bugs) {
-        this.bugs = bugs;
+    public BugController(BugService service) {
+        this.service = service;
     }
 
     @PostMapping
     public ResponseEntity<Bug> create(@Valid @RequestBody BugRequest request) {
-        Bug bug = new Bug();
-        apply(bug, request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(bugs.save(bug));
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
+    /** List bugs, newest first. All filters are optional and combine with AND. */
     @GetMapping
-    public List<Bug> list() {
-        return bugs.findAllByOrderByCreatedAtDesc();
+    public List<Bug> list(@RequestParam(required = false) Bug.Status status,
+                          @RequestParam(required = false) Bug.Severity severity,
+                          @RequestParam(required = false) String repo,
+                          @RequestParam(required = false) String q) {
+        return service.search(status, severity, repo, q);
+    }
+
+    @GetMapping("/stats")
+    public BugStats stats() {
+        return service.stats();
     }
 
     @GetMapping("/{id}")
     public Bug get(@PathVariable Long id) {
-        return find(id);
+        return service.get(id);
     }
 
     @PutMapping("/{id}")
     public Bug update(@PathVariable Long id, @Valid @RequestBody BugRequest request) {
-        Bug bug = find(id);
-        apply(bug, request);
-        return bugs.save(bug);
+        return service.update(id, request);
     }
 
     @PatchMapping("/{id}/status")
     public Bug updateStatus(@PathVariable Long id, @Valid @RequestBody StatusRequest request) {
-        Bug bug = find(id);
-        bug.setStatus(request.status());
-        bug.setUpdatedAt(Instant.now());
-        return bugs.save(bug);
+        return service.changeStatus(id, request.status());
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        bugs.delete(find(id));
+        service.delete(id);
         return ResponseEntity.noContent().build();
-    }
-
-    private Bug find(Long id) {
-        return bugs.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Bug not found: " + id));
-    }
-
-    private static void apply(Bug bug, BugRequest r) {
-        bug.setTitle(r.title());
-        bug.setDescription(r.description());
-        if (r.severity() != null) bug.setSeverity(r.severity());
-        bug.setTargetRepo(r.targetRepo());
-        bug.setUpdatedAt(Instant.now());
     }
 }
