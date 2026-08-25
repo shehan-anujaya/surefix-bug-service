@@ -1,0 +1,25 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: bug-service
+  config:
+    # Datasource + shared settings come from the Config Server (surefix-config/bug-service[-gcp].yaml)
+    import: configserver:${CONFIG_URL:http://localhost:8888}
+  cloud:
+    config:
+      fail-fast: true   # exit if the Config Server is unreachable; PM2 restarts us until it is
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
